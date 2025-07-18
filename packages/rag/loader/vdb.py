@@ -4,6 +4,7 @@ from pymilvus import MilvusClient, DataType
 MODEL="mxbai-embed-large:latest"
 DIMENSION_EMBEDDING=1024
 DIMENSION_TEXT=4096
+RAG_IMAGES_COLLECTION = 'ragimages'
 
 LIMIT=30
 
@@ -33,6 +34,8 @@ class VectorDB:
       schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True, auto_id=True)
       schema.add_field(field_name="text", datatype=DataType.VARCHAR, max_length=DIMENSION_TEXT)
       schema.add_field(field_name="embeddings", datatype=DataType.FLOAT_VECTOR, dim=DIMENSION_EMBEDDING)
+      if collection == RAG_IMAGES_COLLECTION:
+        schema.add_field(field_name="s3_key", datatype=DataType.VARCHAR, max_length=DIMENSION_TEXT)
       
       index_params = self.client.prepare_index_params()
       index_params.add_index("embeddings", index_type="AUTOINDEX", metric_type="IP")
@@ -52,6 +55,11 @@ class VectorDB:
     vec = self.embed(text)
     return self.client.insert(self.collection, {"text":text, "embeddings": vec})
   
+  def insertImgRef(self, text, s3Key):
+    vec = self.embed(text)
+    print('embed', vec)
+    return self.client.insert(self.collection, {"text":text, "embeddings": vec, "s3_key": s3Key})
+    
   def count(self):
     MAX="1000"
     res = self.client.query(collection_name=self.collection, output_fields=["id"], limit=int(MAX))
@@ -78,8 +86,7 @@ class VectorDB:
     return res
 
   def remove_by_substring(self, inp):
-    cur = self.client.query_iterator(collection_name=self.collection, 
-              batchSize=2, output_fields=["text"])
+    cur = self.client.query_iterator(collection_name=self.collection, batchSize=2, output_fields=["text"])
     res = cur.next()
     ids = []
     while len(res) > 0:

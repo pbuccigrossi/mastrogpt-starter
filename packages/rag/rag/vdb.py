@@ -1,6 +1,7 @@
 import os, requests as req
 from pymilvus import MilvusClient, DataType
 
+RAG_IMAGES_COLLECTION = 'ragimages'
 MODEL="mxbai-embed-large:latest"
 DIMENSION=1024
 LIMIT=30
@@ -60,12 +61,16 @@ class VectorDB:
     return self.client.insert(self.collection, {"text":text, "embeddings": vec})
 
   def vector_search(self, inp, limit=LIMIT):
+    fields = ["text"]
+    if self.collection == RAG_IMAGES_COLLECTION:
+      fields.append("s3_key")
+
     vec = self.embed(inp)
     cur = self.client.search(
       collection_name=self.collection,
       search_params={"metric_type": "IP"},
       anns_field="embeddings", data=[vec],
-      output_fields=["text"],
+      output_fields=fields,
       limit=limit
     )
     res = []
@@ -73,7 +78,12 @@ class VectorDB:
       for item in cur[0]:
         dist = item.get('distance', 0)
         text = item.get("entity", {}).get("text", "")
-        res.append((dist, text))
+
+        if self.collection == RAG_IMAGES_COLLECTION:
+          s3Key = item.get("entity", {}).get("s3_key", "")
+          res.append((dist, text, s3Key))
+        else:
+          res.append((dist, text))
     return res
 
   def remove_by_substring(self, inp):
