@@ -114,9 +114,11 @@ def loadImage(args, image, db):
     visResp = vis.decode(image)
     if visResp == -1:
       print("Error on Vision decode")
+      return -1
     else:
       #load into Vector DB
       res = db.insertImgRef(visResp, s3Key)
+      return 1
   else:
     print("Error on S3 write")
     return -1
